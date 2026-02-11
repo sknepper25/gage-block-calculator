@@ -20,6 +20,9 @@ const elements = {
 
 const UNIT_SCALE = 10000;
 const MAX_SEARCH_MS = 1800;
+let latestSolutions = [];
+let latestTarget = null;
+const UNIT_SCALE = 10000;
 
 initialize();
 
@@ -159,6 +162,30 @@ function findBestSolution(blocks, target, maxBlocks) {
 
             if (errorUnits === 0) {
                 exactFound = true;
+function findBestSolutions(blocks, target, maxBlocks, limit) {
+    const sorted = [...blocks].sort((a, b) => b - a);
+    const sortedUnits = sorted.map(toUnits);
+    const targetUnits = toUnits(target);
+    const maxTotalUnits = toUnits(target + 0.5);
+    const prefixSums = [0];
+    const solutions = [];
+    const seenStacks = new Set();
+
+    for (let i = 0; i < sortedUnits.length; i += 1) {
+        prefixSums.push(prefixSums[i] + sortedUnits[i]);
+    }
+
+    function search(startIndex, currentStack, totalUnits) {
+        const errorUnits = Math.abs(targetUnits - totalUnits);
+
+        if (currentStack.length > 0) {
+            storeSolution(solutions, seenStacks, {
+                stack: [...currentStack].sort((a, b) => a - b).map(fromUnits),
+                total: fromUnits(totalUnits),
+                error: fromUnits(errorUnits)
+            }, limit);
+
+            if (errorUnits <= 1) {
                 return;
             }
         }
