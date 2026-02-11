@@ -1,12 +1,19 @@
+const MM_PER_INCH = 25.4;
+const UNIT_SCALE = 10000;
+const MAX_SEARCH_MS = 1800;
+
 const blockSets = {
-    standard: buildStandardSet(),
-    metric: buildMetricSet()
+    standard: buildStandardSetInches(),
+    metric: buildMetricSetInches()
 };
 
 const elements = {
     targetDimension: document.getElementById('targetDimension'),
+    targetUnits: document.getElementById('targetUnits'),
     gageBlockSet: document.getElementById('gageBlockSet'),
     customSetGroup: document.getElementById('customSetGroup'),
+    customSetUnitsGroup: document.getElementById('customSetUnitsGroup'),
+    customSetUnits: document.getElementById('customSetUnits'),
     customBlocks: document.getElementById('customBlocks'),
     maxBlocks: document.getElementById('maxBlocks'),
     calculateBtn: document.getElementById('calculateBtn'),
@@ -15,14 +22,16 @@ const elements = {
     resultTarget: document.getElementById('resultTarget'),
     resultTotal: document.getElementById('resultTotal'),
     resultError: document.getElementById('resultError'),
-    stackList: document.getElementById('stackList')
+    stackList: document.getElementById('stackList'),
+    sineAngle: document.getElementById('sineAngle'),
+    sineLength: document.getElementById('sineLength'),
+    sineLengthUnits: document.getElementById('sineLengthUnits'),
+    calculateSineBtn: document.getElementById('calculateSineBtn'),
+    sineResults: document.getElementById('sineResults'),
+    resultSineAngle: document.getElementById('resultSineAngle'),
+    resultSineLength: document.getElementById('resultSineLength'),
+    resultSineHeight: document.getElementById('resultSineHeight')
 };
-
-const UNIT_SCALE = 10000;
-const MAX_SEARCH_MS = 1800;
-let latestSolutions = [];
-let latestTarget = null;
-const UNIT_SCALE = 10000;
 
 initialize();
 
@@ -30,10 +39,11 @@ function initialize() {
     elements.gageBlockSet.addEventListener('change', toggleCustomSet);
     elements.calculateBtn.addEventListener('click', handleCalculate);
     elements.resetBtn.addEventListener('click', handleReset);
+    elements.calculateSineBtn.addEventListener('click', handleSineCalculate);
     toggleCustomSet();
 }
 
-function buildStandardSet() {
+function buildStandardSetInches() {
     const values = [];
 
     addRange(values, 0.1001, 0.1009, 0.0001);
@@ -42,10 +52,10 @@ function buildStandardSet() {
     addRange(values, 0.2, 0.9, 0.1);
     addRange(values, 1, 4, 1);
 
-    return values.map(roundToFour).sort((a, b) => a - b);
+    return [...new Set(values.map(roundToFour))].sort((a, b) => a - b);
 }
 
-function buildMetricSet() {
+function buildMetricSetInches() {
     const mmValues = [
         0.5,
         ...createNumericRange(1, 9, 0.5),
@@ -53,20 +63,23 @@ function buildMetricSet() {
     ];
 
     return mmValues
-        .map(mm => roundToFour(mm / 25.4))
+        .map(mmToInches)
+        .map(roundToFour)
         .sort((a, b) => a - b);
 }
 
 function toggleCustomSet() {
     const isCustom = elements.gageBlockSet.value === 'custom';
     elements.customSetGroup.style.display = isCustom ? 'block' : 'none';
+    elements.customSetUnitsGroup.style.display = isCustom ? 'block' : 'none';
 }
 
 function handleCalculate() {
-    const target = Number.parseFloat(elements.targetDimension.value);
+    const inputTarget = Number.parseFloat(elements.targetDimension.value);
+    const targetUnits = elements.targetUnits.value;
     const maxBlocks = Number.parseInt(elements.maxBlocks.value, 10);
 
-    if (!Number.isFinite(target) || target <= 0) {
+    if (!Number.isFinite(inputTarget) || inputTarget <= 0) {
         alert('Enter a valid target dimension greater than zero.');
         return;
     }
@@ -76,53 +89,89 @@ function handleCalculate() {
         return;
     }
 
-    const blocks = getSelectedBlocks();
-    if (blocks.length === 0) {
+    const targetInches = convertToInches(inputTarget, targetUnits);
+    const blocksInches = getSelectedBlocksInches();
+
+    if (blocksInches.length === 0) {
         alert('No valid blocks are available for the selected set.');
         return;
     }
 
-    const solution = findBestSolution(blocks, target, maxBlocks);
+    const solution = findBestSolution(blocksInches, targetInches, maxBlocks);
     if (!solution) {
         alert('No valid stack could be found with the selected constraints.');
         return;
     }
 
-    renderResults(target, solution);
+    renderResults(inputTarget, targetUnits, solution);
+}
+
+function handleSineCalculate() {
+    const angleDeg = Number.parseFloat(elements.sineAngle.value);
+    const lengthValue = Number.parseFloat(elements.sineLength.value);
+    const lengthUnits = elements.sineLengthUnits.value;
+
+    if (!Number.isFinite(angleDeg) || angleDeg < 0 || angleDeg >= 90) {
+        alert('Enter a valid angle between 0 and less than 90 degrees.');
+        return;
+    }
+
+    if (!Number.isFinite(lengthValue) || lengthValue <= 0) {
+        alert('Enter a valid sine bar length greater than zero.');
+        return;
+    }
+
+    const heightValue = lengthValue * Math.sin((angleDeg * Math.PI) / 180);
+    const heightInches = convertToInches(heightValue, lengthUnits);
+
+    elements.sineResults.style.display = 'grid';
+    elements.resultSineAngle.textContent = `${angleDeg.toFixed(4)}°`;
+    elements.resultSineLength.textContent = formatValueInBothUnits(
+        convertToInches(lengthValue, lengthUnits),
+        lengthUnits,
+        lengthValue
+    );
+    elements.resultSineHeight.textContent = `${formatByUnits(heightValue, lengthUnits)} (${formatOppositeUnits(heightInches, lengthUnits)})`;
 }
 
 function handleReset() {
     elements.targetDimension.value = '';
+    elements.targetUnits.value = 'inch';
     elements.gageBlockSet.value = 'standard';
+    elements.customSetUnits.value = 'inch';
     elements.customBlocks.value = '';
     elements.maxBlocks.value = '9';
+    elements.sineAngle.value = '';
+    elements.sineLength.value = '';
+    elements.sineLengthUnits.value = 'inch';
     elements.resultsSection.style.display = 'none';
+    elements.sineResults.style.display = 'none';
     elements.stackList.innerHTML = '';
     toggleCustomSet();
 }
 
-function getSelectedBlocks() {
+function getSelectedBlocksInches() {
     if (elements.gageBlockSet.value !== 'custom') {
         return blockSets[elements.gageBlockSet.value] || [];
     }
 
+    const customUnits = elements.customSetUnits.value;
     const parsed = elements.customBlocks.value
         .split(',')
         .map(item => Number.parseFloat(item.trim()))
         .filter(value => Number.isFinite(value) && value > 0)
+        .map(value => convertToInches(value, customUnits))
         .map(roundToFour);
 
     return [...new Set(parsed)].sort((a, b) => a - b);
 }
 
-function findBestSolution(blocks, target, maxBlocks) {
-    const sortedUnits = [...blocks]
-        .map(toUnits)
-        .sort((a, b) => b - a);
-
-    const targetUnits = toUnits(target);
-    const maxTotalUnits = toUnits(target + 0.5);
+function findBestSolution(blocksInches, targetInches, maxBlocks) {
+    const sortedUnits = [...blocksInches].map(toUnits).sort((a, b) => b - a);
+    const targetUnits = toUnits(targetInches);
+    const maxTotalUnits = toUnits(targetInches + 0.5);
     const prefixSums = [0];
+
     for (let i = 0; i < sortedUnits.length; i += 1) {
         prefixSums.push(prefixSums[i] + sortedUnits[i]);
     }
@@ -130,7 +179,6 @@ function findBestSolution(blocks, target, maxBlocks) {
     const startTime = nowMs();
     let nodeCount = 0;
     let best = null;
-    let exactFound = false;
 
     function shouldStop() {
         return nowMs() - startTime >= MAX_SEARCH_MS;
@@ -152,56 +200,26 @@ function findBestSolution(blocks, target, maxBlocks) {
 
     function search(startIndex, currentStack, totalUnits) {
         nodeCount += 1;
-        if (nodeCount % 1024 === 0 && shouldStop()) {
+        if (nodeCount % 2048 === 0 && shouldStop()) {
             return;
         }
 
         if (currentStack.length > 0) {
             const errorUnits = Math.abs(targetUnits - totalUnits);
             updateBest(currentStack, totalUnits, errorUnits);
-
             if (errorUnits === 0) {
-                exactFound = true;
-function findBestSolutions(blocks, target, maxBlocks, limit) {
-    const sorted = [...blocks].sort((a, b) => b - a);
-    const sortedUnits = sorted.map(toUnits);
-    const targetUnits = toUnits(target);
-    const maxTotalUnits = toUnits(target + 0.5);
-    const prefixSums = [0];
-    const solutions = [];
-    const seenStacks = new Set();
-
-    for (let i = 0; i < sortedUnits.length; i += 1) {
-        prefixSums.push(prefixSums[i] + sortedUnits[i]);
-    }
-
-    function search(startIndex, currentStack, totalUnits) {
-        const errorUnits = Math.abs(targetUnits - totalUnits);
-
-        if (currentStack.length > 0) {
-            storeSolution(solutions, seenStacks, {
-                stack: [...currentStack].sort((a, b) => a - b).map(fromUnits),
-                total: fromUnits(totalUnits),
-                error: fromUnits(errorUnits)
-            }, limit);
-
-            if (errorUnits <= 1) {
                 return;
             }
         }
 
-        if (exactFound || currentStack.length >= maxBlocks || startIndex >= sortedUnits.length) {
-            return;
-        }
-
-        const currentError = Math.abs(targetUnits - totalUnits);
-        if (best && totalUnits >= targetUnits && currentError >= best.errorUnits) {
+        if (currentStack.length >= maxBlocks || startIndex >= sortedUnits.length) {
             return;
         }
 
         const remainingSlots = maxBlocks - currentStack.length;
         const maxAdditional = getMaxAdditionalTotal(prefixSums, sortedUnits.length, startIndex, remainingSlots);
         const maxReachable = totalUnits + maxAdditional;
+
         if (best && targetUnits > maxReachable) {
             const minPossibleError = targetUnits - maxReachable;
             if (minPossibleError >= best.errorUnits) {
@@ -215,17 +233,13 @@ function findBestSolutions(blocks, target, maxBlocks, limit) {
                 continue;
             }
 
+            if (best && nextTotal > targetUnits && nextTotal - targetUnits >= best.errorUnits) {
+                continue;
+            }
+
             currentStack.push(sortedUnits[i]);
             search(i + 1, currentStack, nextTotal);
             currentStack.pop();
-
-            if (exactFound) {
-                return;
-            }
-
-            if (nodeCount % 1024 === 0 && shouldStop()) {
-                return;
-            }
         }
     }
 
@@ -236,9 +250,9 @@ function findBestSolutions(blocks, target, maxBlocks, limit) {
     }
 
     return {
-        stack: best.stackUnits.map(fromUnits),
-        total: fromUnits(best.totalUnits),
-        error: fromUnits(best.errorUnits)
+        stackInches: best.stackUnits.map(fromUnits),
+        totalInches: fromUnits(best.totalUnits),
+        errorInches: fromUnits(best.errorUnits)
     };
 }
 
@@ -251,19 +265,23 @@ function getMaxAdditionalTotal(prefixSums, totalLength, startIndex, remainingSlo
     return prefixSums[endExclusive] - prefixSums[startIndex];
 }
 
-function renderResults(target, solution) {
+function renderResults(inputTarget, targetUnits, solution) {
     elements.resultsSection.style.display = 'block';
 
-    elements.resultTarget.textContent = formatInches(target);
-    elements.resultTotal.textContent = formatInches(solution.total);
-    elements.resultError.textContent = formatInches(solution.error);
-    elements.resultError.style.color = solution.error <= 0.0001 ? '#0d8f49' : '#c64c00';
+    const inputTargetInches = convertToInches(inputTarget, targetUnits);
+    elements.resultTarget.textContent = `${formatByUnits(inputTarget, targetUnits)} (${formatOppositeUnits(inputTargetInches, targetUnits)})`;
+    elements.resultTotal.textContent = `${formatByUnits(convertFromInches(solution.totalInches, targetUnits), targetUnits)} (${formatOppositeUnits(solution.totalInches, targetUnits)})`;
+    elements.resultError.textContent = `${formatByUnits(convertFromInches(solution.errorInches, targetUnits), targetUnits)} (${formatOppositeUnits(solution.errorInches, targetUnits)})`;
+    elements.resultError.style.color = solution.errorInches <= 0.0001 ? '#0d8f49' : '#c64c00';
 
     elements.stackList.innerHTML = '';
-    solution.stack.forEach(block => {
+    solution.stackInches.forEach(blockInches => {
         const blockElement = document.createElement('div');
         blockElement.className = 'block-item';
-        blockElement.innerHTML = `<div class="size">${formatInches(block)}</div><div class="unit">inch</div>`;
+        blockElement.innerHTML = `
+            <div class="size">${formatInches(blockInches)}</div>
+            <div class="unit">${formatMillimeters(inchesToMm(blockInches))}</div>
+        `;
         elements.stackList.appendChild(blockElement);
     });
 }
@@ -276,7 +294,6 @@ function addRange(values, start, end, step) {
 
 function createNumericRange(start, end, step) {
     const values = [];
-
     for (let value = start; value <= end + step / 10; value += step) {
         values.push(value);
     }
@@ -296,8 +313,40 @@ function roundToFour(value) {
     return Number.parseFloat(value.toFixed(4));
 }
 
+function convertToInches(value, units) {
+    return units === 'mm' ? value / MM_PER_INCH : value;
+}
+
+function convertFromInches(inches, units) {
+    return units === 'mm' ? inchesToMm(inches) : inches;
+}
+
+function mmToInches(mm) {
+    return mm / MM_PER_INCH;
+}
+
+function inchesToMm(inches) {
+    return inches * MM_PER_INCH;
+}
+
 function formatInches(value) {
     return `${value.toFixed(4)}\"`;
+}
+
+function formatMillimeters(value) {
+    return `${value.toFixed(3)} mm`;
+}
+
+function formatByUnits(value, units) {
+    return units === 'mm' ? formatMillimeters(value) : formatInches(value);
+}
+
+function formatOppositeUnits(inches, preferredUnits) {
+    return preferredUnits === 'mm' ? formatInches(inches) : formatMillimeters(inchesToMm(inches));
+}
+
+function formatValueInBothUnits(inches, units, enteredValue) {
+    return `${formatByUnits(enteredValue, units)} (${formatOppositeUnits(inches, units)})`;
 }
 
 function nowMs() {

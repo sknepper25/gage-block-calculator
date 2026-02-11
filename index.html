@@ -15,23 +15,43 @@
 
         <main>
             <section class="input-section">
-                <div class="form-group">
-                    <label for="targetDimension">Target Dimension (inches):</label>
-                    <input type="number" id="targetDimension" placeholder="e.g., 1.5234" step="0.0001" min="0">
+                <h2>Gage Block Calculator</h2>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="targetDimension">Target Dimension:</label>
+                        <input type="number" id="targetDimension" placeholder="e.g., 1.5234" step="0.0001" min="0">
+                    </div>
+
+                    <div class="form-group compact">
+                        <label for="targetUnits">Target Units:</label>
+                        <select id="targetUnits">
+                            <option value="inch">Inch</option>
+                            <option value="mm">Millimeter (mm)</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="form-group">
                     <label for="gageBlockSet">Select Gage Block Set:</label>
                     <select id="gageBlockSet">
-                        <option value="standard">Standard Set (81 pieces)</option>
+                        <option value="standard">Standard Inch Set (81 pieces)</option>
                         <option value="metric">Metric Set</option>
                         <option value="custom">Custom Set</option>
                     </select>
                 </div>
 
                 <div class="form-group" id="customSetGroup" style="display: none;">
-                    <label for="customBlocks">Custom Blocks (comma-separated):</label>
+                    <label for="customBlocks">Custom Blocks (comma-separated in selected block units):</label>
                     <input type="text" id="customBlocks" placeholder="e.g., 0.1001, 0.1002, 0.2, 1.0">
+                </div>
+
+                <div class="form-group" id="customSetUnitsGroup" style="display: none;">
+                    <label for="customSetUnits">Custom Set Units:</label>
+                    <select id="customSetUnits">
+                        <option value="inch">Inch</option>
+                        <option value="mm">Millimeter (mm)</option>
+                    </select>
                 </div>
 
                 <div class="form-group">
@@ -44,8 +64,8 @@
             </section>
 
             <section class="results-section" id="resultsSection" style="display: none;">
-                <h2>Results</h2>
-                
+                <h2>Stack Results</h2>
+
                 <div class="results-info">
                     <div class="info-item">
                         <span class="label">Target Dimension:</span>
@@ -63,25 +83,63 @@
 
                 <div class="stack-display">
                     <h3>Gage Block Stack (Smallest to Largest):</h3>
-                    <div id="stackList" class="stack-blocks">
-                        <!-- Blocks will be inserted here -->
+                    <div id="stackList" class="stack-blocks"></div>
+                </div>
+            </section>
+
+            <section class="input-section">
+                <h2>Sine Bar / Sine Vise Calculator</h2>
+                <p class="subtext">Compute required stack height from angle and sine bar length.</p>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="sineAngle">Desired Angle (degrees):</label>
+                        <input type="number" id="sineAngle" placeholder="e.g., 12.5" step="0.0001" min="0" max="90">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="sineLength">Sine Bar / Vise Length:</label>
+                        <input type="number" id="sineLength" placeholder="e.g., 5.0000" step="0.0001" min="0">
+                    </div>
+
+                    <div class="form-group compact">
+                        <label for="sineLengthUnits">Length Units:</label>
+                        <select id="sineLengthUnits">
+                            <option value="inch">Inch</option>
+                            <option value="mm">Millimeter (mm)</option>
+                        </select>
                     </div>
                 </div>
 
+                <button id="calculateSineBtn" class="btn-primary">Calculate Sine Stack Height</button>
+
+                <div class="results-info" id="sineResults" style="display: none; margin-top: 20px;">
+                    <div class="info-item">
+                        <span class="label">Angle:</span>
+                        <span class="value" id="resultSineAngle">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Sine Bar Length:</span>
+                        <span class="value" id="resultSineLength">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Required Stack Height:</span>
+                        <span class="value" id="resultSineHeight">-</span>
+                    </div>
+                </div>
             </section>
 
             <section class="info-section">
                 <h2>About Gage Blocks</h2>
                 <p>Gage blocks (also known as slip gauges or Johansson gauges) are precision blocks of hardened steel that can be stacked to create nearly any exact dimension. This calculator helps you determine the optimal combination of blocks from your set.</p>
-                
+
                 <h3>Standard Set (81 pieces)</h3>
                 <ul>
                     <li>0.1001" to 0.1009" (9 blocks)</li>
                     <li>0.101" to 0.109" (9 blocks)</li>
                     <li>0.11" to 0.19" (9 blocks)</li>
                     <li>0.2" to 0.9" (8 blocks)</li>
-                    <li>1" to 8" (8 blocks)</li>
-                    <li>Plus additional specialty blocks</li>
+                    <li>1" to 4" (4 blocks)</li>
                 </ul>
             </section>
         </main>

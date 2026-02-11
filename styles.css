@@ -47,8 +47,35 @@ main {
     margin-bottom: 40px;
 }
 
+.input-section h2,
+.results-section h2,
+.info-section h2 {
+    color: #333;
+    margin-bottom: 16px;
+    font-size: 1.8em;
+}
+
+.subtext {
+    color: #555;
+    margin-bottom: 16px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 16px;
+}
+
+.form-row .form-group:last-child {
+    align-self: end;
+}
+
 .form-group {
     margin-bottom: 20px;
+}
+
+.form-group.compact {
+    max-width: 260px;
 }
 
 label {
@@ -116,13 +143,6 @@ select:focus {
     border-color: #999;
 }
 
-.results-section h2,
-.info-section h2 {
-    color: #333;
-    margin-bottom: 20px;
-    font-size: 1.8em;
-}
-
 .results-info {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -137,6 +157,7 @@ select:focus {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 14px;
 }
 
 .info-item .label {
@@ -145,10 +166,11 @@ select:focus {
 }
 
 .info-item .value {
-    font-size: 1.3em;
+    font-size: 1.1em;
     font-weight: 700;
     color: #667eea;
     font-family: 'Courier New', monospace;
+    text-align: right;
 }
 
 .stack-display h3 {
@@ -159,7 +181,7 @@ select:focus {
 
 .stack-blocks {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
     gap: 12px;
     padding: 20px;
     background: #f9f9f9;
@@ -177,7 +199,7 @@ select:focus {
 }
 
 .block-item .size {
-    font-size: 1.4em;
+    font-size: 1.2em;
     font-weight: 700;
     color: #667eea;
     font-family: 'Courier New', monospace;
@@ -186,9 +208,9 @@ select:focus {
 
 .block-item .unit {
     font-size: 0.9em;
-    color: #999;
+    color: #777;
+    font-family: 'Courier New', monospace;
 }
-
 
 .info-section {
     padding: 20px;
@@ -227,6 +249,16 @@ select:focus {
     }
 }
 
+@media (max-width: 700px) {
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .form-group.compact {
+        max-width: none;
+    }
+}
+
 @media (max-width: 600px) {
     header h1 {
         font-size: 1.8em;
@@ -241,7 +273,7 @@ select:focus {
     }
 
     .stack-blocks {
-        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     }
 
     .btn-primary,
