@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gage Block Stack Calculator</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Gage Block Stack Calculator</h1>
+            <p>Calculate the optimal gage block combination to reach your target dimension</p>
+        </header>
+
+        <main>
+            <section class="input-section">
+                <div class="form-group">
+                    <label for="targetDimension">Target Dimension (inches):</label>
+                    <input type="number" id="targetDimension" placeholder="e.g., 1.5234" step="0.0001" min="0">
+                </div>
+
+                <div class="form-group">
+                    <label for="gageBlockSet">Select Gage Block Set:</label>
+                    <select id="gageBlockSet">
+                        <option value="standard">Standard Set (81 pieces)</option>
+                        <option value="metric">Metric Set</option>
+                        <option value="custom">Custom Set</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="customSetGroup" style="display: none;">
+                    <label for="customBlocks">Custom Blocks (comma-separated):</label>
+                    <input type="text" id="customBlocks" placeholder="e.g., 0.1001, 0.1002, 0.2, 1.0">
+                </div>
+
+                <div class="form-group">
+                    <label for="maxBlocks">Maximum Blocks in Stack:</label>
+                    <input type="number" id="maxBlocks" value="9" min="1" max="20">
+                </div>
+
+                <button id="calculateBtn" class="btn-primary">Calculate Stack</button>
+                <button id="resetBtn" class="btn-secondary">Reset</button>
+            </section>
+
+            <section class="results-section" id="resultsSection" style="display: none;">
+                <h2>Results</h2>
+                
+                <div class="results-info">
+                    <div class="info-item">
+                        <span class="label">Target Dimension:</span>
+                        <span class="value" id="resultTarget">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Stack Total:</span>
+                        <span class="value" id="resultTotal">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Error:</span>
+                        <span class="value" id="resultError">-</span>
+                    </div>
+                </div>
+
+                <div class="stack-display">
+                    <h3>Gage Block Stack (Smallest to Largest):</h3>
+                    <div id="stackList" class="stack-blocks">
+                        <!-- Blocks will be inserted here -->
+                    </div>
+                </div>
+
+                <div id="alternativeSolutions" style="display: none;">
+                    <h3>Alternative Solutions</h3>
+                    <div id="alternativesList" class="alternatives-list">
+                        <!-- Alternatives will be inserted here -->
+                    </div>
+                </div>
+
+                <div class="action-buttons">
+                    <button id="printBtn" class="btn-secondary">Print Results</button>
+                    <button id="exportBtn" class="btn-secondary">Export as CSV</button>
+                </div>
+            </section>
+
+            <section class="info-section">
+                <h2>About Gage Blocks</h2>
+                <p>Gage blocks (also known as slip gauges or Johansson gauges) are precision blocks of hardened steel that can be stacked to create nearly any exact dimension. This calculator helps you determine the optimal combination of blocks from your set.</p>
+                
+                <h3>Standard Set (81 pieces)</h3>
+                <ul>
+                    <li>0.1001" to 0.1009" (9 blocks)</li>
+                    <li>0.101" to 0.109" (9 blocks)</li>
+                    <li>0.11" to 0.19" (9 blocks)</li>
+                    <li>0.2" to 0.9" (8 blocks)</li>
+                    <li>1" to 8" (8 blocks)</li>
+                    <li>Plus additional specialty blocks</li>
+                </ul>
+            </section>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
