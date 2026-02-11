@@ -27,6 +27,7 @@ const elements = {
     sineLength: document.getElementById('sineLength'),
     sineLengthUnits: document.getElementById('sineLengthUnits'),
     calculateSineBtn: document.getElementById('calculateSineBtn'),
+    calculateSineAndStackBtn: document.getElementById('calculateSineAndStackBtn'),
     sineResults: document.getElementById('sineResults'),
     resultSineAngle: document.getElementById('resultSineAngle'),
     resultSineLength: document.getElementById('resultSineLength'),
@@ -40,6 +41,7 @@ function initialize() {
     elements.calculateBtn.addEventListener('click', handleCalculate);
     elements.resetBtn.addEventListener('click', handleReset);
     elements.calculateSineBtn.addEventListener('click', handleSineCalculate);
+    elements.calculateSineAndStackBtn.addEventListener('click', handleSineAndStackCalculate);
     toggleCustomSet();
 }
 
@@ -107,31 +109,63 @@ function handleCalculate() {
 }
 
 function handleSineCalculate() {
+    const sineValues = getValidatedSineValues();
+    if (!sineValues) {
+        return;
+    }
+
+    renderSineResults(sineValues);
+}
+
+function handleSineAndStackCalculate() {
+    const sineValues = getValidatedSineValues();
+    if (!sineValues) {
+        return;
+    }
+
+    renderSineResults(sineValues);
+
+    elements.targetUnits.value = sineValues.lengthUnits;
+    elements.targetDimension.value = sineValues.heightValue.toFixed(4);
+    handleCalculate();
+}
+
+function getValidatedSineValues() {
     const angleDeg = Number.parseFloat(elements.sineAngle.value);
     const lengthValue = Number.parseFloat(elements.sineLength.value);
     const lengthUnits = elements.sineLengthUnits.value;
 
     if (!Number.isFinite(angleDeg) || angleDeg < 0 || angleDeg >= 90) {
         alert('Enter a valid angle between 0 and less than 90 degrees.');
-        return;
+        return null;
     }
 
     if (!Number.isFinite(lengthValue) || lengthValue <= 0) {
         alert('Enter a valid sine bar length greater than zero.');
-        return;
+        return null;
     }
 
     const heightValue = lengthValue * Math.sin((angleDeg * Math.PI) / 180);
     const heightInches = convertToInches(heightValue, lengthUnits);
 
-    elements.sineResults.style.display = 'grid';
-    elements.resultSineAngle.textContent = `${angleDeg.toFixed(4)}°`;
-    elements.resultSineLength.textContent = formatValueInBothUnits(
-        convertToInches(lengthValue, lengthUnits),
+    return {
+        angleDeg,
+        lengthValue,
         lengthUnits,
-        lengthValue
+        heightValue,
+        heightInches
+    };
+}
+
+function renderSineResults(sineValues) {
+    elements.sineResults.style.display = 'grid';
+    elements.resultSineAngle.textContent = `${sineValues.angleDeg.toFixed(4)}°`;
+    elements.resultSineLength.textContent = formatValueInBothUnits(
+        convertToInches(sineValues.lengthValue, sineValues.lengthUnits),
+        sineValues.lengthUnits,
+        sineValues.lengthValue
     );
-    elements.resultSineHeight.textContent = `${formatByUnits(heightValue, lengthUnits)} (${formatOppositeUnits(heightInches, lengthUnits)})`;
+    elements.resultSineHeight.textContent = `${formatByUnits(sineValues.heightValue, sineValues.lengthUnits)} (${formatOppositeUnits(sineValues.heightInches, sineValues.lengthUnits)})`;
 }
 
 function handleReset() {
