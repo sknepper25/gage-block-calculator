@@ -1,5 +1,5 @@
 const MM_PER_INCH = 25.4;
-const UNIT_SCALE = 10000;
+const UNIT_SCALE = 1000000;
 const MAX_SEARCH_MS = 1800;
 
 const blockSets = {
@@ -58,16 +58,18 @@ function buildStandardSetInches() {
 }
 
 function buildMetricSetInches() {
+    // Common metric gage block inventory based on the standard 87-piece set.
+    // Values are kept in mm and only converted to inches for search math,
+    // so rendered metric sizes stay on true nominal values (for example 5.000 mm).
     const mmValues = [
         0.5,
-        ...createNumericRange(1, 9, 0.5),
-        ...createNumericRange(10, 90, 10)
+        ...createNumericRange(1.001, 1.009, 0.001),
+        ...createNumericRange(1.01, 1.49, 0.01),
+        ...createNumericRange(1.5, 9.5, 0.5),
+        ...createNumericRange(10, 100, 10)
     ];
 
-    return mmValues
-        .map(mmToInches)
-        .map(roundToFour)
-        .sort((a, b) => a - b);
+    return [...new Set(mmValues.map(mmToInches))].sort((a, b) => a - b);
 }
 
 function toggleCustomSet() {
