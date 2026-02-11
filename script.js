@@ -24,6 +24,7 @@ const elements = {
 
 let latestSolutions = [];
 let latestTarget = null;
+const UNIT_SCALE = 10000;
 
 initialize();
 
@@ -128,19 +129,28 @@ function getSelectedBlocks() {
 
 function findBestSolutions(blocks, target, maxBlocks, limit) {
     const sorted = [...blocks].sort((a, b) => b - a);
+    const sortedUnits = sorted.map(toUnits);
+    const targetUnits = toUnits(target);
+    const maxTotalUnits = toUnits(target + 0.5);
+    const prefixSums = [0];
     const solutions = [];
+    const seenStacks = new Set();
 
-    function search(startIndex, currentStack, total) {
-        const error = Math.abs(target - total);
+    for (let i = 0; i < sortedUnits.length; i += 1) {
+        prefixSums.push(prefixSums[i] + sortedUnits[i]);
+    }
+
+    function search(startIndex, currentStack, totalUnits) {
+        const errorUnits = Math.abs(targetUnits - totalUnits);
 
         if (currentStack.length > 0) {
-            storeSolution(solutions, {
-                stack: [...currentStack].sort((a, b) => a - b),
-                total: roundToFour(total),
-                error: roundToFour(error)
+            storeSolution(solutions, seenStacks, {
+                stack: [...currentStack].sort((a, b) => a - b).map(fromUnits),
+                total: fromUnits(totalUnits),
+                error: fromUnits(errorUnits)
             }, limit);
 
-            if (error < 0.0001) {
+            if (errorUnits <= 1) {
                 return;
             }
         }
@@ -149,26 +159,38 @@ function findBestSolutions(blocks, target, maxBlocks, limit) {
             return;
         }
 
+        const worstAllowedError = solutions.length >= limit
+            ? toUnits(solutions[solutions.length - 1].error)
+            : Number.POSITIVE_INFINITY;
+        if (totalUnits >= targetUnits && errorUnits >= worstAllowedError) {
+            return;
+        }
+
+        const remainingSlots = maxBlocks - currentStack.length;
+        const maxAdditional = getMaxAdditionalTotal(prefixSums, sortedUnits.length, startIndex, remainingSlots);
+        const maxReachable = totalUnits + maxAdditional;
+        const minPossibleError = getMinimumError(targetUnits, totalUnits, maxReachable);
+        if (minPossibleError > worstAllowedError) {
+            return;
+        }
+
         for (let i = startIndex; i < sorted.length; i += 1) {
-            const nextValue = sorted[i];
-            const nextTotal = roundToFour(total + nextValue);
+            const nextValueUnits = sortedUnits[i];
+            const nextTotalUnits = totalUnits + nextValueUnits;
 
-            if (nextTotal > target + 0.5) {
+            if (nextTotalUnits > maxTotalUnits) {
                 continue;
             }
 
-            const smallestKnownError = solutions.length ? solutions[0].error : Number.POSITIVE_INFINITY;
-            const nextError = Math.abs(target - nextTotal);
-            if (
-                solutions.length >= limit
-                && nextError > smallestKnownError
-                && nextTotal > target
-            ) {
-                continue;
+            if (solutions.length >= limit) {
+                const nextError = Math.abs(targetUnits - nextTotalUnits);
+                if (nextTotalUnits >= targetUnits && nextError >= worstAllowedError) {
+                    continue;
+                }
             }
 
-            currentStack.push(nextValue);
-            search(i + 1, currentStack, nextTotal);
+            currentStack.push(nextValueUnits);
+            search(i + 1, currentStack, nextTotalUnits);
             currentStack.pop();
         }
     }
@@ -184,11 +206,22 @@ function findBestSolutions(blocks, target, maxBlocks, limit) {
     });
 }
 
-function storeSolution(collection, candidate, limit) {
+function getMaxAdditionalTotal(prefixSums, totalLength, startIndex, remainingSlots) {
+    if (remainingSlots <= 0 || startIndex >= totalLength) {
+        return 0;
+    }
+
+    const endExclusive = Math.min(totalLength, startIndex + remainingSlots);
+    return prefixSums[endExclusive] - prefixSums[startIndex];
+}
+
+function storeSolution(collection, seenStacks, candidate, limit) {
     const key = candidate.stack.join('|');
-    if (collection.some(existing => existing.stack.join('|') === key)) {
+    if (seenStacks.has(key)) {
         return;
     }
+
+    seenStacks.add(key);
 
     collection.push(candidate);
     collection.sort((a, b) => {
@@ -200,8 +233,29 @@ function storeSolution(collection, candidate, limit) {
     });
 
     if (collection.length > limit) {
-        collection.length = limit;
+        const removed = collection.pop();
+        seenStacks.delete(removed.stack.join('|'));
     }
+}
+
+function getMinimumError(target, minimumTotal, maximumTotal) {
+    if (target < minimumTotal) {
+        return minimumTotal - target;
+    }
+
+    if (target > maximumTotal) {
+        return target - maximumTotal;
+    }
+
+    return 0;
+}
+
+function toUnits(value) {
+    return Math.round(value * UNIT_SCALE);
+}
+
+function fromUnits(value) {
+    return value / UNIT_SCALE;
 }
 
 function renderResults(target, solutions) {
