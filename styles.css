@@ -151,8 +151,7 @@ select:focus {
     font-family: 'Courier New', monospace;
 }
 
-.stack-display h3,
-#alternativeSolutions h3 {
+.stack-display h3 {
     margin-top: 30px;
     margin-bottom: 15px;
     color: #333;
@@ -190,31 +189,6 @@ select:focus {
     color: #999;
 }
 
-.alternatives-list {
-    max-height: 400px;
-    overflow-y: auto;
-}
-
-.alternative-item {
-    padding: 15px;
-    margin-bottom: 10px;
-    background: #f9f9f9;
-    border-left: 4px solid #764ba2;
-    border-radius: 4px;
-}
-
-.alternative-item .alt-blocks {
-    margin-top: 8px;
-    font-family: 'Courier New', monospace;
-    font-size: 0.95em;
-    color: #555;
-}
-
-.action-buttons {
-    margin-top: 30px;
-    padding-top: 20px;
-    border-top: 2px solid #e0e0e0;
-}
 
 .info-section {
     padding: 20px;

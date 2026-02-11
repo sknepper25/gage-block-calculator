@@ -15,15 +15,11 @@ const elements = {
     resultTarget: document.getElementById('resultTarget'),
     resultTotal: document.getElementById('resultTotal'),
     resultError: document.getElementById('resultError'),
-    stackList: document.getElementById('stackList'),
-    alternativeSolutions: document.getElementById('alternativeSolutions'),
-    alternativesList: document.getElementById('alternativesList'),
-    printBtn: document.getElementById('printBtn'),
-    exportBtn: document.getElementById('exportBtn')
+    stackList: document.getElementById('stackList')
 };
 
-let latestSolutions = [];
-let latestTarget = null;
+const UNIT_SCALE = 10000;
+const MAX_SEARCH_MS = 1800;
 
 initialize();
 
@@ -31,9 +27,6 @@ function initialize() {
     elements.gageBlockSet.addEventListener('change', toggleCustomSet);
     elements.calculateBtn.addEventListener('click', handleCalculate);
     elements.resetBtn.addEventListener('click', handleReset);
-    elements.printBtn.addEventListener('click', () => window.print());
-    elements.exportBtn.addEventListener('click', exportResults);
-
     toggleCustomSet();
 }
 
@@ -50,7 +43,6 @@ function buildStandardSet() {
 }
 
 function buildMetricSet() {
-    // Common metric set values converted to inches.
     const mmValues = [
         0.5,
         ...createNumericRange(1, 9, 0.5),
@@ -87,15 +79,13 @@ function handleCalculate() {
         return;
     }
 
-    const solutions = findBestSolutions(blocks, target, maxBlocks, 5);
-    if (solutions.length === 0) {
+    const solution = findBestSolution(blocks, target, maxBlocks);
+    if (!solution) {
         alert('No valid stack could be found with the selected constraints.');
         return;
     }
 
-    latestSolutions = solutions;
-    latestTarget = target;
-    renderResults(target, solutions);
+    renderResults(target, solution);
 }
 
 function handleReset() {
@@ -105,10 +95,6 @@ function handleReset() {
     elements.maxBlocks.value = '9';
     elements.resultsSection.style.display = 'none';
     elements.stackList.innerHTML = '';
-    elements.alternativesList.innerHTML = '';
-    elements.alternativeSolutions.style.display = 'none';
-    latestSolutions = [];
-    latestTarget = null;
     toggleCustomSet();
 }
 
@@ -126,152 +112,133 @@ function getSelectedBlocks() {
     return [...new Set(parsed)].sort((a, b) => a - b);
 }
 
-function findBestSolutions(blocks, target, maxBlocks, limit) {
-    const sorted = [...blocks].sort((a, b) => b - a);
-    const solutions = [];
+function findBestSolution(blocks, target, maxBlocks) {
+    const sortedUnits = [...blocks]
+        .map(toUnits)
+        .sort((a, b) => b - a);
 
-    function search(startIndex, currentStack, total) {
-        const error = Math.abs(target - total);
+    const targetUnits = toUnits(target);
+    const maxTotalUnits = toUnits(target + 0.5);
+    const prefixSums = [0];
+    for (let i = 0; i < sortedUnits.length; i += 1) {
+        prefixSums.push(prefixSums[i] + sortedUnits[i]);
+    }
+
+    const startTime = nowMs();
+    let nodeCount = 0;
+    let best = null;
+    let exactFound = false;
+
+    function shouldStop() {
+        return nowMs() - startTime >= MAX_SEARCH_MS;
+    }
+
+    function updateBest(stackUnits, totalUnits, errorUnits) {
+        if (
+            !best
+            || errorUnits < best.errorUnits
+            || (errorUnits === best.errorUnits && stackUnits.length < best.stackUnits.length)
+        ) {
+            best = {
+                stackUnits: [...stackUnits].sort((a, b) => a - b),
+                totalUnits,
+                errorUnits
+            };
+        }
+    }
+
+    function search(startIndex, currentStack, totalUnits) {
+        nodeCount += 1;
+        if (nodeCount % 1024 === 0 && shouldStop()) {
+            return;
+        }
 
         if (currentStack.length > 0) {
-            storeSolution(solutions, {
-                stack: [...currentStack].sort((a, b) => a - b),
-                total: roundToFour(total),
-                error: roundToFour(error)
-            }, limit);
+            const errorUnits = Math.abs(targetUnits - totalUnits);
+            updateBest(currentStack, totalUnits, errorUnits);
 
-            if (error < 0.0001) {
+            if (errorUnits === 0) {
+                exactFound = true;
                 return;
             }
         }
 
-        if (currentStack.length >= maxBlocks || startIndex >= sorted.length) {
+        if (exactFound || currentStack.length >= maxBlocks || startIndex >= sortedUnits.length) {
             return;
         }
 
-        for (let i = startIndex; i < sorted.length; i += 1) {
-            const nextValue = sorted[i];
-            const nextTotal = roundToFour(total + nextValue);
+        const currentError = Math.abs(targetUnits - totalUnits);
+        if (best && totalUnits >= targetUnits && currentError >= best.errorUnits) {
+            return;
+        }
 
-            if (nextTotal > target + 0.5) {
+        const remainingSlots = maxBlocks - currentStack.length;
+        const maxAdditional = getMaxAdditionalTotal(prefixSums, sortedUnits.length, startIndex, remainingSlots);
+        const maxReachable = totalUnits + maxAdditional;
+        if (best && targetUnits > maxReachable) {
+            const minPossibleError = targetUnits - maxReachable;
+            if (minPossibleError >= best.errorUnits) {
+                return;
+            }
+        }
+
+        for (let i = startIndex; i < sortedUnits.length; i += 1) {
+            const nextTotal = totalUnits + sortedUnits[i];
+            if (nextTotal > maxTotalUnits) {
                 continue;
             }
 
-            const smallestKnownError = solutions.length ? solutions[0].error : Number.POSITIVE_INFINITY;
-            const nextError = Math.abs(target - nextTotal);
-            if (
-                solutions.length >= limit
-                && nextError > smallestKnownError
-                && nextTotal > target
-            ) {
-                continue;
-            }
-
-            currentStack.push(nextValue);
+            currentStack.push(sortedUnits[i]);
             search(i + 1, currentStack, nextTotal);
             currentStack.pop();
+
+            if (exactFound) {
+                return;
+            }
+
+            if (nodeCount % 1024 === 0 && shouldStop()) {
+                return;
+            }
         }
     }
 
     search(0, [], 0);
 
-    return solutions.sort((a, b) => {
-        if (a.error !== b.error) {
-            return a.error - b.error;
-        }
-
-        return a.stack.length - b.stack.length;
-    });
-}
-
-function storeSolution(collection, candidate, limit) {
-    const key = candidate.stack.join('|');
-    if (collection.some(existing => existing.stack.join('|') === key)) {
-        return;
+    if (!best) {
+        return null;
     }
 
-    collection.push(candidate);
-    collection.sort((a, b) => {
-        if (a.error !== b.error) {
-            return a.error - b.error;
-        }
-
-        return a.stack.length - b.stack.length;
-    });
-
-    if (collection.length > limit) {
-        collection.length = limit;
-    }
+    return {
+        stack: best.stackUnits.map(fromUnits),
+        total: fromUnits(best.totalUnits),
+        error: fromUnits(best.errorUnits)
+    };
 }
 
-function renderResults(target, solutions) {
-    const [best, ...alternatives] = solutions;
+function getMaxAdditionalTotal(prefixSums, totalLength, startIndex, remainingSlots) {
+    if (remainingSlots <= 0 || startIndex >= totalLength) {
+        return 0;
+    }
+
+    const endExclusive = Math.min(totalLength, startIndex + remainingSlots);
+    return prefixSums[endExclusive] - prefixSums[startIndex];
+}
+
+function renderResults(target, solution) {
     elements.resultsSection.style.display = 'block';
 
     elements.resultTarget.textContent = formatInches(target);
-    elements.resultTotal.textContent = formatInches(best.total);
-
-    elements.resultError.textContent = formatInches(best.error);
-    elements.resultError.style.color = best.error <= 0.0001 ? '#0d8f49' : '#c64c00';
+    elements.resultTotal.textContent = formatInches(solution.total);
+    elements.resultError.textContent = formatInches(solution.error);
+    elements.resultError.style.color = solution.error <= 0.0001 ? '#0d8f49' : '#c64c00';
 
     elements.stackList.innerHTML = '';
-    best.stack.forEach(block => {
+    solution.stack.forEach(block => {
         const blockElement = document.createElement('div');
         blockElement.className = 'block-item';
         blockElement.innerHTML = `<div class="size">${formatInches(block)}</div><div class="unit">inch</div>`;
         elements.stackList.appendChild(blockElement);
     });
-
-    renderAlternatives(alternatives);
-}
-
-function renderAlternatives(alternatives) {
-    elements.alternativesList.innerHTML = '';
-
-    if (alternatives.length === 0) {
-        elements.alternativeSolutions.style.display = 'none';
-        return;
-    }
-
-    alternatives.forEach((solution, index) => {
-        const altItem = document.createElement('div');
-        altItem.className = 'alternative-item';
-        altItem.innerHTML = `
-            <strong>Alternative ${index + 1}</strong><br>
-            Total: ${formatInches(solution.total)} | Error: ${formatInches(solution.error)}
-            <div class="alt-blocks">${solution.stack.map(formatInches).join(' + ')}</div>
-        `;
-        elements.alternativesList.appendChild(altItem);
-    });
-
-    elements.alternativeSolutions.style.display = 'block';
-}
-
-function exportResults() {
-    if (!latestSolutions.length || latestTarget == null) {
-        alert('Run a calculation before exporting results.');
-        return;
-    }
-
-    const headers = ['Rank', 'Target (in)', 'Total (in)', 'Error (in)', 'Blocks'];
-    const rows = latestSolutions.map((solution, index) => [
-        index + 1,
-        latestTarget.toFixed(4),
-        solution.total.toFixed(4),
-        solution.error.toFixed(4),
-        solution.stack.map(value => value.toFixed(4)).join(' + ')
-    ]);
-
-    const csvContent = [headers, ...rows]
-        .map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(','))
-        .join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'gage-block-stack-results.csv';
-    link.click();
-    URL.revokeObjectURL(link.href);
 }
 
 function addRange(values, start, end, step) {
@@ -290,10 +257,26 @@ function createNumericRange(start, end, step) {
     return values;
 }
 
+function toUnits(value) {
+    return Math.round(value * UNIT_SCALE);
+}
+
+function fromUnits(value) {
+    return value / UNIT_SCALE;
+}
+
 function roundToFour(value) {
     return Number.parseFloat(value.toFixed(4));
 }
 
 function formatInches(value) {
     return `${value.toFixed(4)}\"`;
+}
+
+function nowMs() {
+    if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
+        return performance.now();
+    }
+
+    return Date.now();
 }
